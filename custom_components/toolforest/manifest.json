@@ -1,0 +1,14 @@
+{
+  "domain": "toolforest",
+  "name": "Home Assistant toolkit",
+  "version": "0.1.0",
+  "config_flow": true,
+  "documentation": "https://github.com/Toolforest-io/toolforest-home-assistant",
+  "issue_tracker": "https://github.com/Toolforest-io/toolforest-home-assistant/issues",
+  "codeowners": [
+    "@primevalsoup"
+  ],
+  "iot_class": "cloud_push",
+  "integration_type": "service",
+  "requirements": []
+}

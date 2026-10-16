@@ -1,0 +1,7 @@
+{
+  "name": "Home Assistant toolkit",
+  "render_readme": true,
+  "homeassistant": "2026.10.1",
+  "zip_release": true,
+  "filename": "toolforest.zip"
+}
