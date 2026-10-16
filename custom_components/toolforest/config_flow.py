@@ -77,7 +77,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required("name", default="Home Assistant"): vol.All(
                         str, vol.Length(min=1, max=64)
                     ),
-                    vol.Required("environment", default="prod"): vol.In(ENVIRONMENTS),
+                    vol.Required("environment", default="prod"): vol.In(
+                        {"dev": "Development", "test": "Test", "prod": "Production"}
+                    ),
                 }
             ),
         )
