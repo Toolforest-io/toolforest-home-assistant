@@ -1,0 +1,62 @@
+{
+  "title": "Home Assistant toolkit",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Home Assistant toolkit",
+        "description": "Connect devices managed by Home Assistant. This does not automatically expose an existing Apple Home configuration.",
+        "data": {
+          "name": "Instance name",
+          "environment": "Toolforest environment"
+        }
+      },
+      "pairing": {
+        "title": "Pair with your Toolforest account",
+        "description": "Open [{url}]({url}), sign in to Toolforest, and approve code **{code}**. Then submit here. The code expires after 10 minutes."
+      },
+      "exposure": {
+        "title": "Select exposed entities and actions",
+        "description": "Nothing is exposed by default. Select lights and switches for reads, then separately allow each action. Action selections must also be in the read selection. Other entity domains are excluded.",
+        "data": {
+          "read_entities": "Entities to expose for state reads",
+          "turn_on_entities": "Exposed entities allowed to turn on",
+          "turn_off_entities": "Exposed entities allowed to turn off",
+          "brightness_entities": "Exposed lights allowed to change brightness"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Pair again",
+        "description": "The Toolforest device was revoked or its credential is no longer valid. Pair this Home Assistant instance again."
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach Toolforest. Check connectivity and try again.",
+      "authorization_pending": "Approve the code in Toolforest first, wait a few seconds, then submit again.",
+      "invalid_exposure": "Every action target must also be selected for state reads; brightness is limited to lights."
+    },
+    "abort": {
+      "pairing_expired": "The pairing code expired or was already used. Start setup again.",
+      "reauth_successful": "Pairing updated.",
+      "already_configured": "This device is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Select exposed entities and actions",
+        "description": "Nothing is exposed by default. Select lights and switches for reads, then separately allow each action. Action selections must also be in the read selection. Other entity domains are excluded.",
+        "data": {
+          "read_entities": "Entities to expose for state reads",
+          "turn_on_entities": "Exposed entities allowed to turn on",
+          "turn_off_entities": "Exposed entities allowed to turn off",
+          "brightness_entities": "Exposed lights allowed to change brightness"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach Toolforest. Check connectivity and try again.",
+      "authorization_pending": "Approve the code in Toolforest first, wait a few seconds, then submit again.",
+      "invalid_exposure": "Every action target must also be selected for state reads; brightness is limited to lights."
+    }
+  }
+}
