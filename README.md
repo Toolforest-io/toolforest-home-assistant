@@ -70,8 +70,8 @@ service dispatcher.
 
 Brightness requires an exposed light with supported color modes and separate
 brightness permission, and is valid only with `turn_on`. No toggle or arbitrary
-service names/parameters are accepted. Unknown, hidden, unavailable, or restricted
-targets fail closed. Responses omit raw HA attributes and friendly names.
+service names/parameters are accepted. Controls against unknown, hidden,
+unavailable, or restricted targets fail closed. Responses omit raw HA attributes and friendly names.
 The control response is the state observed after the native service call, not
 proof that physical hardware reached that state. A selected HA group may itself
 control multiple devices; select individual entities when that is undesirable.

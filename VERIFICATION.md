@@ -10,6 +10,8 @@ It does not automatically expose an existing Apple Home configuration.
   argument/deadline/deduplication checks, actual local async WebSocket contracts,
   revocation/cancellation, concurrent-request rejection and package validation.
 - Ruff passed for `custom_components`, `tests` and `scripts`.
+- [GitHub CI passed](https://github.com/Toolforest-io/toolforest-home-assistant/actions/runs/38876688299),
+  including all 26 tests, lint and the uploaded integration archive.
 - `python scripts/package.py --version 0.1.0` built `dist/toolforest.zip`; tests
   confirm it installs without development files and rejects a mismatched version.
 - Local Home Assistant **2026.10.1** runs with demo entities and loads the manifest
