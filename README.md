@@ -21,7 +21,7 @@ Home Assistant Supervisor add-on and does not run a separate service.
 
 The repository follows the [HACS integration layout](https://www.hacs.dev/docs/publish/integration/).
 It has not been submitted to the HACS default catalog, and no release has been
-published yet. During development, install the reviewed feature branch manually.
+published yet. During development, install the reviewed `main` branch manually.
 After a release is published, users can add
 `https://github.com/Toolforest-io/toolforest-home-assistant` as a **custom
 repository** of type **Integration** in HACS, then download **Home Assistant
@@ -36,7 +36,9 @@ toolkit** and restart Home Assistant. HACS installation has not yet been verifie
 2. In **Settings → Devices & services → Add integration**, find
    **Home Assistant toolkit**.
 3. Enter an instance name and select the Toolforest environment. Normal users
-   select `prod`; development verification uses `dev`.
+   select the environment matching their Toolforest account. The toolkit is
+   currently enabled only for development verification, so use `dev` there;
+   its test and production catalog entries remain disabled.
 4. Open the displayed Toolforest activation URL, sign in to the matching
    environment, and approve the displayed device code. Return to the HA setup
    dialog and submit. Codes expire after ten minutes; pending polls are throttled.
@@ -52,10 +54,12 @@ stop/start its owned WSS/tasks without changing pairing. Revoked credentials
 start a reauthentication flow. Removing the integration attempts remote device
 revocation; if the network is unavailable, revoke the device in Toolforest too.
 
-In the Toolforest portal, the toolkit row lists paired instances, each with its
-own live/offline status and revoke button. Its selector chooses which instance
-to inspect or revoke in that row. It does not silently change an MCP tool's
-target: every MCP call explicitly supplies `instance_id` from `list_instances`.
+The portal update accompanying the connection guide keeps the toolkit row compact:
+**Show me how to connect** opens the guide, and **⋮ → Manage connections** lists
+paired instances with their status and individual disconnect actions. With multiple
+instances, the row's Disconnect button opens that dialog instead of choosing a target.
+Inspecting connections does not change an MCP tool's target: every MCP call
+explicitly supplies `instance_id` from `list_instances`.
 Entity/action exposure is managed inside Home Assistant, never by a cloud
 service dispatcher.
 
