@@ -7,11 +7,12 @@ import aiohttp
 import pytest
 import pytest_asyncio
 from aiohttp import web
-from ha_toolforest import transport
+
+from custom_components.toolforest import transport
 
 
 @pytest_asyncio.fixture
-async def server(unused_tcp_port):
+async def server(unused_tcp_port, socket_enabled):
     app = web.Application()
     sockets = []
     headers = []
@@ -136,6 +137,47 @@ async def test_busy_rejects_concurrent_requests(server, monkeypatch):
                 await asyncio.sleep(0.01)
         assert responses[0]["correlation_id"] == "second"
         assert responses[0]["body"]["error"]["code"] == "BUSY"
+        await bridge.close()
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+async def test_application_heartbeat_is_sent_and_cleanly_cancelled(server, monkeypatch):
+    endpoint, _sockets, _headers, ready, responses = server
+    monkeypatch.setitem(transport.ENVIRONMENTS, "dev", ("unused", endpoint))
+    monkeypatch.setattr(transport, "HEARTBEAT_SECONDS", 0.02)
+    async with aiohttp.ClientSession() as session:
+        bridge = transport.BridgeTransport(
+            session, "secret", "dev", AsyncMock(), Mock(), Mock()
+        )
+        task = asyncio.create_task(bridge.run())
+        await asyncio.wait_for(ready.wait(), 2)
+        async with asyncio.timeout(2):
+            while not responses:
+                await asyncio.sleep(0.01)
+        assert responses == [{"v": 1, "type": "ping"}]
+        await bridge.close()
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+async def test_idle_connection_survives_receive_timeout(server, monkeypatch):
+    # Like the gateway: answers WS pings, never replies to application pings.
+    endpoint, _sockets, headers, ready, _responses = server
+    monkeypatch.setitem(transport.ENVIRONMENTS, "dev", ("unused", endpoint))
+    monkeypatch.setattr(transport, "HEARTBEAT_SECONDS", 0.2)
+    monkeypatch.setattr(transport, "WS_PING_SECONDS", 0.1)
+    monkeypatch.setattr(transport, "RECEIVE_TIMEOUT_SECONDS", 0.3)
+    status = Mock()
+    async with aiohttp.ClientSession() as session:
+        bridge = transport.BridgeTransport(
+            session, "secret", "dev", AsyncMock(), status, Mock()
+        )
+        task = asyncio.create_task(bridge.run())
+        await asyncio.wait_for(ready.wait(), 2)
+        await asyncio.sleep(1.2)  # four receive-timeout windows
+        assert len(headers) == 1
+        status.assert_called_with("connected")
         await bridge.close()
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)

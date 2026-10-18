@@ -51,6 +51,10 @@ Options changes reload the integration. Disable/re-enable or reload the entry to
 stop/start its owned WSS/tasks without changing pairing. Revoked credentials
 start a reauthentication flow. Removing the integration attempts remote device
 revocation; if the network is unavailable, revoke the device in Toolforest too.
+Abandoning setup after pairing also attempts to revoke the unused credential.
+If that cleanup cannot reach Toolforest, remove the offline device in the portal.
+Reauthentication retains the existing environment, name and exposure selections,
+including after a connection error, and updates the entry's device identity.
 
 In the Toolforest portal, the toolkit row lists paired instances, each with its
 own live/offline status and revoke button. Its selector chooses which instance
@@ -66,11 +70,13 @@ service dispatcher.
 | `list_instances` | none | List this account's paired instances, including offline ones |
 | `list_entities` | `instance_id`, optional `offset`, `limit` (1–100) | Sorted page of exposed lights/switches |
 | `get_entity_state` | `instance_id`, `entity_id` | Current state, allowed actions, limited brightness fields |
-| `control_entity` | `instance_id`, `entity_id`, `action` (`turn_on`/`turn_off`), optional `brightness` (0–255) | One explicitly allowed native HA call |
+| `control_entity` | `instance_id`, `entity_id`, `action` (`turn_on`/`turn_off`), optional `brightness` (1–255) | One explicitly allowed native HA call |
 
 Brightness requires an exposed light with supported color modes and separate
 brightness permission, and is valid only with `turn_on`. No toggle or arbitrary
-service names/parameters are accepted. Controls against unknown, hidden,
+service names/parameters are accepted. Brightness zero is rejected because Home
+Assistant interprets it as turning the light off; use explicitly allowed `turn_off`.
+Controls against unknown, hidden,
 unavailable, or restricted targets fail closed. Responses omit raw HA attributes and friendly names.
 The control response is the state observed after the native service call, not
 proof that physical hardware reached that state. A selected HA group may itself
@@ -85,7 +91,11 @@ control multiple devices; select individual entities when that is undesirable.
 - Pending responses are bound to both account and exact receiving connection.
 - Requests carry correlation IDs and an absolute deadline, bounded by the
   existing bridge protocol's 15-second ceiling. HA rejects expired/duplicate
-  requests, limits concurrent execution to one, and rechecks current exposure,
+  requests, allows up to five seconds of HA clock lag at admission, limits
+  execution to the smaller of the relative timeout and locally remaining deadline
+  (at most 15 seconds), and retains duplicate IDs using monotonic time for the
+  full 20-second admission window. A locally expired deadline is still rejected.
+  HA limits concurrent execution to one and rechecks current exposure,
   action permission, state and capabilities at execution time.
 - Controls are never automatically retried or replayed across reconnects. After
   timeout/disconnect, execution may be uncertain: read state before deciding
@@ -147,7 +157,7 @@ and portal repositories' deployment instructions.
 Run inside this repository:
 
 ```bash
-python3.12 -m venv .venv
+python3.14 -m venv .venv
 .venv/bin/python -m pip install -r requirements-test.txt
 .venv/bin/python -m pytest -q
 .venv/bin/ruff check custom_components tests scripts
@@ -159,6 +169,12 @@ same tests, lint and packaging checks on pull requests and `main`. A `v*` tag al
 checks that the manifest version matches the tag and prepares a **draft** GitHub
 release. Publish a release only after the corresponding real UI/device-flow and
 MCP verification is recorded; creating the feature branch does not release it.
+
+Tests use `pytest-homeassistant-custom-component==0.13.372`, which pins Home
+Assistant **2026.10.1** and its compatible pytest dependencies. Python **3.14.2+**
+is required. Configuration, options, reauth, sensors and entry lifecycle run
+through native Home Assistant; HTTP/WSS contract tests use ephemeral loopback
+servers with synthetic credentials, never a paired development instance.
 
 Run the separate backend checks from `toolforest_tools`:
 
