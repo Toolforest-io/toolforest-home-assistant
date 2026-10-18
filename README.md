@@ -21,7 +21,7 @@ Home Assistant Supervisor add-on and does not run a separate service.
 
 The repository follows the [HACS integration layout](https://www.hacs.dev/docs/publish/integration/).
 It has not been submitted to the HACS default catalog, and no release has been
-published yet. During development, install the reviewed `main` branch manually.
+published yet. During development, install the reviewed source from `main` manually.
 After a release is published, users can add
 `https://github.com/Toolforest-io/toolforest-home-assistant` as a **custom
 repository** of type **Integration** in HACS, then download **Home Assistant
@@ -35,10 +35,9 @@ toolkit** and restart Home Assistant. HACS installation has not yet been verifie
    contains the integration's files directly). Restart Home Assistant.
 2. In **Settings → Devices & services → Add integration**, find
    **Home Assistant toolkit**.
-3. Enter an instance name and select the Toolforest environment. Normal users
-   select the environment matching their Toolforest account. The toolkit is
-   currently enabled only for development verification, so use `dev` there;
-   its test and production catalog entries remain disabled.
+3. Enter an instance name and select the environment matching your Toolforest
+   account. The toolkit is enabled only for development verification, so use
+   `dev` there; its test and production catalog entries remain disabled.
 4. Open the displayed Toolforest activation URL, sign in to the matching
    environment, and approve the displayed device code. Return to the HA setup
    dialog and submit. Codes expire after ten minutes; pending polls are throttled.
@@ -80,8 +79,8 @@ Brightness requires an exposed light with supported color modes and separate
 brightness permission, and is valid only with `turn_on`. No toggle or arbitrary
 service names/parameters are accepted. Brightness zero is rejected because Home
 Assistant interprets it as turning the light off; use explicitly allowed `turn_off`.
-Controls against unknown, hidden,
-unavailable, or restricted targets fail closed. Responses omit raw HA attributes and friendly names.
+Controls against unknown, hidden, unavailable, or restricted targets fail closed.
+Responses omit raw HA attributes and friendly names.
 The control response is the state observed after the native service call, not
 proof that physical hardware reached that state. A selected HA group may itself
 control multiple devices; select individual entities when that is undesirable.
@@ -98,15 +97,22 @@ control multiple devices; select individual entities when that is undesirable.
   requests, allows up to five seconds of HA clock lag at admission, limits
   execution to the smaller of the relative timeout and locally remaining deadline
   (at most 15 seconds), and retains duplicate IDs using monotonic time for the
-  full 20-second admission window. A locally expired deadline is still rejected.
+  20-second admission window while the current executor exists. The duplicate
+  history resets on integration reload; transport reconnect alone preserves it.
+  A locally expired deadline is still rejected. Keep the HA clock synchronized;
+  the allowance only covers up to five seconds of clock lag, not arbitrary skew.
   HA limits concurrent execution to one and rechecks current exposure,
   action permission, state and capabilities at execution time.
 - Controls are never automatically retried or replayed across reconnects. After
   timeout/disconnect, execution may be uncertain: read state before deciding
   whether to repeat an action. HA automations can give repeated calls side effects.
-- Transport tasks use async I/O, heartbeat and capped reconnect backoff. Unload,
-  shutdown, revocation and disconnect cancel owned pending work; cancellation
-  cannot undo a native action already accepted by Home Assistant.
+- Transport tasks use async I/O and capped reconnect backoff. One owned heartbeat
+  task runs application pings every 60 seconds to refresh the gateway TTL and
+  WebSocket pings every 30 seconds to keep idle connections receiving pongs. The
+  gateway does not reply to application pings. The receive timeout is 90 seconds;
+  aiohttp's separate `heartbeat=` timer is not used. Unload, shutdown, revocation
+  and disconnect cancel owned pending work; cancellation cannot undo a native
+  action already accepted by Home Assistant.
 - Revocation is rechecked against the authoritative device record before cloud
   dispatch. HA sessions expire after missed application heartbeats (120 seconds);
   the normal disconnect handler removes them sooner.
@@ -120,7 +126,9 @@ control multiple devices; select individual entities when that is undesirable.
 Tested target: Home Assistant **2026.10.1**, official container digest
 `sha256:130241f28d01fa80dfa3b44f7d89781c188d8642ecab9024f079f19f9f82baa0`.
 
-From a workspace containing a `toolforest-home-assistant` checkout:
+The following creates a **fresh** test instance from a workspace containing a
+`toolforest-home-assistant` checkout of `main`. For an existing
+instance, use the resume instructions below rather than recreating its config:
 
 ```bash
 colima start --cpu 4 --memory 6 --disk 30
