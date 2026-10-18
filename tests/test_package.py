@@ -14,7 +14,9 @@ def test_release_contains_installable_integration_and_license(tmp_path):
         names = set(archive.namelist())
         assert {"__init__.py", "manifest.json", "config_flow.py", "LICENSE"} <= names
         assert "translations/en.json" in names
-        assert not any(name.startswith(("tests/", "custom_components/")) for name in names)
+        assert not any(
+            name.startswith(("tests/", "custom_components/")) for name in names
+        )
         assert not any("__pycache__" in name or name.endswith(".pyc") for name in names)
         manifest = json.loads(archive.read("manifest.json"))
         assert manifest["domain"] == "toolforest"

@@ -14,6 +14,11 @@ import time
 
 _LOGGER = logging.getLogger(__name__)
 ENTITY = re.compile(r"^(light|switch)\.[a-z0-9_]+$")
+MAX_REQUEST_MS = 15_000
+# A slow HA clock must not reject an otherwise fresh gateway request. Allow
+# at most five seconds of lag at admission; never extend a locally expired
+# deadline or the relative execution budget supplied by the gateway.
+CLOCK_LAG_MS = 5_000
 
 
 class Denied(Exception):
@@ -112,16 +117,22 @@ class Executor:
                 or not 1 <= len(correlation) <= 128
                 or type(expiry) is not int
                 or type(timeout) is not int
-                or not 0 < timeout <= 15000
-                or not now < expiry <= now + 15000
+                or not 0 < timeout <= MAX_REQUEST_MS
             ):
+                raise Denied("INVALID_ARGUMENT")
+            if not now < expiry <= now + MAX_REQUEST_MS + CLOCK_LAG_MS:
                 raise Denied("DEADLINE_EXCEEDED")
-            self.seen = {k: v for k, v in self.seen.items() if v > now}
+            monotonic_now = time.monotonic()
+            self.seen = {k: v for k, v in self.seen.items() if v > monotonic_now}
             if correlation in self.seen:
                 raise Denied("DUPLICATE_REQUEST")
             if len(self.seen) >= 1000:
                 raise Denied("BUSY")
-            self.seen[correlation] = expiry
+            # Retain the ID for the maximum accepted envelope lifetime, even
+            # after its shorter execution timeout or a wall-clock correction.
+            self.seen[correlation] = (
+                monotonic_now + (MAX_REQUEST_MS + CLOCK_LAG_MS) / 1000
+            )
             body = message.get("body")
             if (
                 not isinstance(body, dict)
@@ -192,7 +203,7 @@ class Executor:
             brightness = params["brightness"]
             if (
                 type(brightness) is not int
-                or not 0 <= brightness <= 255
+                or not 1 <= brightness <= 255
                 or service != "turn_on"
                 or not self._describe(state)["brightness_allowed"]
             ):

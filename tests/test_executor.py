@@ -4,7 +4,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from ha_toolforest.executor import Denied, Executor, validate_exposure
+
+from custom_components.toolforest.executor import Denied, Executor, validate_exposure
 
 
 @pytest.fixture
@@ -194,6 +195,139 @@ async def test_native_deadline_reports_uncertain(executor):
     )
     result = await executor.execute(msg)
     assert result["error"] == {"code": "DEADLINE_EXCEEDED", "outcome": "uncertain"}
+    assert await executor.execute(msg) == {"error": {"code": "DUPLICATE_REQUEST"}}
+    assert executor.hass.services.async_call.await_count == 1
+
+
+@pytest.mark.parametrize("brightness", [0, -1])
+async def test_brightness_cannot_bypass_turn_off_permission(executor, brightness):
+    executor.entry.options["turn_off_entities"] = []
+    result = await executor.execute(
+        request(
+            "control_entity",
+            {
+                "entity_id": "light.allowed",
+                "action": "turn_on",
+                "brightness": brightness,
+            },
+        )
+    )
+    assert result == {"error": {"code": "ACTION_NOT_ALLOWED"}}
+    executor.hass.services.async_call.assert_not_awaited()
+
+
+@pytest.mark.parametrize("brightness", [1, 255])
+async def test_brightness_boundaries_do_not_require_turn_off_permission(
+    executor, brightness
+):
+    executor.entry.options["turn_off_entities"] = []
+    result = await executor.execute(
+        request(
+            "control_entity",
+            {
+                "entity_id": "light.allowed",
+                "action": "turn_on",
+                "brightness": brightness,
+            },
+        )
+    )
+    assert "error" not in result
+    executor.hass.services.async_call.assert_awaited_once()
+
+
+@pytest.mark.parametrize("lag_ms", [0, 300, 1000, 5000])
+async def test_gateway_shaped_deadline_tolerates_clock_lag(
+    executor, monkeypatch, lag_ms
+):
+    # Gateway spent 150ms before dispatch; delivery took 50ms. A fresh
+    # request still has 14.8s of the original gateway deadline remaining.
+    sent_ms = 1_000_000
+    monkeypatch.setattr(
+        "custom_components.toolforest.executor.time.time",
+        lambda: (sent_ms + 50 - lag_ms) / 1000,
+    )
+    msg = request(timeout_ms=14850, expires_at_ms=sent_ms + 14850)
+    assert "error" not in await executor.execute(msg)
+
+
+@pytest.mark.parametrize("expiry_offset", [-1, 0, 20001])
+async def test_expired_or_excessively_future_deadlines_are_denied(
+    executor, monkeypatch, expiry_offset
+):
+    monkeypatch.setattr("custom_components.toolforest.executor.time.time", lambda: 1000)
+    result = await executor.execute(request(expires_at_ms=1_000_000 + expiry_offset))
+    assert result == {"error": {"code": "DEADLINE_EXCEEDED"}}
+
+
+@pytest.mark.parametrize(
+    "updates",
+    [
+        {"correlation_id": None},
+        {"correlation_id": ""},
+        {"timeout_ms": True},
+        {"timeout_ms": 0},
+        {"timeout_ms": 15001},
+        {"expires_at_ms": "tomorrow"},
+    ],
+)
+async def test_malformed_envelope_is_not_reported_as_expired(executor, updates):
+    assert await executor.execute(request(**updates)) == {
+        "error": {"code": "INVALID_ARGUMENT"}
+    }
+
+
+async def test_clock_lag_does_not_extend_relative_execution_timeout(
+    executor, monkeypatch
+):
+    now = time.time()
+    monkeypatch.setattr(
+        "custom_components.toolforest.executor.time.time", lambda: now - 1
+    )
+
+    async def slow(*args, **kwargs):
+        await asyncio.sleep(10)
+
+    executor.hass.services.async_call.side_effect = slow
+    result = await executor.execute(
+        request(
+            "control_entity",
+            {"entity_id": "light.allowed", "action": "turn_on"},
+            timeout_ms=10,
+            expires_at_ms=int(now * 1000) + 14850,
+        )
+    )
+    assert result == {"error": {"code": "DEADLINE_EXCEEDED", "outcome": "uncertain"}}
+
+
+async def test_dedupe_survives_short_timeout_and_wall_clock_correction(
+    executor, monkeypatch
+):
+    wall, monotonic = [1000.0], [100.0]
+    monkeypatch.setattr(
+        "custom_components.toolforest.executor.time.time", lambda: wall[0]
+    )
+    # Patch the executor's clock reference, without replacing the event loop's
+    # global monotonic clock, which would affect pytest/asyncio timeout handling.
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        "custom_components.toolforest.executor.time",
+        SimpleNamespace(time=lambda: wall[0], monotonic=lambda: monotonic[0]),
+    )
+    msg = request(timeout_ms=100, expires_at_ms=1000100)
+    assert "error" not in await executor.execute(msg)
+    wall[0], monotonic[0] = 999, 101
+    assert await executor.execute(msg) == {"error": {"code": "DUPLICATE_REQUEST"}}
+    # A correction in the opposite direction must not evict the ID either.
+    wall[0], monotonic[0] = 1000.05, 102
+    assert await executor.execute(msg) == {"error": {"code": "DUPLICATE_REQUEST"}}
+
+
+async def test_full_dedupe_cache_does_not_evict_live_requests(executor):
+    executor.seen = {str(i): time.monotonic() + 20 for i in range(1000)}
+    assert await executor.execute(request()) == {"error": {"code": "BUSY"}}
+    executor.seen = {"expired": time.monotonic() - 1}
+    assert "error" not in await executor.execute(request())
 
 
 def test_options_cannot_expose_restricted_entities():

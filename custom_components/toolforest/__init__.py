@@ -10,6 +10,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import DOMAIN, STATUS_SIGNAL
+from .device_auth import async_revoke_device
 from .executor import Executor, validate_exposure
 from .transport import BridgeTransport
 
@@ -72,16 +73,7 @@ async def async_unload_entry(hass, entry):
 
 
 async def async_remove_entry(hass, entry):
-    import aiohttp
-
-    from .const import ENVIRONMENTS
-
     # Removal revokes the remote device; unload/reload preserves pairing.
-    with contextlib.suppress(aiohttp.ClientError, TimeoutError):
-        async with async_get_clientsession(hass).post(
-            f"{ENVIRONMENTS[entry.data['environment']][0]}/device/revoke-self",
-            headers={"Authorization": f"Bearer {entry.data['access_token']}"},
-            json={},
-            timeout=aiohttp.ClientTimeout(total=10),
-        ) as response:
-            await response.read()
+    await async_revoke_device(
+        hass, entry.data["environment"], entry.data["access_token"]
+    )
