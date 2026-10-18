@@ -21,15 +21,23 @@ Home Assistant Supervisor add-on and does not run a separate service.
 
 The repository follows the [HACS integration layout](https://www.hacs.dev/docs/publish/integration/).
 It has not been submitted to the HACS default catalog, and no release has been
-published yet. During development, install the reviewed source from `main` manually.
-After a release is published, users can add
+published yet. For custom-repository installation, add
 `https://github.com/Toolforest-io/toolforest-home-assistant` as a **custom
 repository** of type **Integration** in HACS, then download **Home Assistant
-toolkit** and restart Home Assistant. HACS installation has not yet been verified.
+toolkit** from `main` and restart Home Assistant. HACS downloads the integration
+directory from GitHub source; a published release asset is not required for this
+path. Published versions will appear in HACS once releases are available. The
+`toolforest.zip` archive remains available for manual installation.
+
+The toolkit is currently enabled for **dev verification only**. HACS distribution
+does not enable the Toolforest toolkit in test or production. See
+[HACS validation and release preparation](docs/HACS_RELEASE.md) for checks,
+installation evidence and the separate release/catalog approval steps.
 
 ## Install and pair
 
-1. Copy this repository's `custom_components/toolforest` directory into your HA
+1. Install through HACS as described above, or copy this repository's
+   `custom_components/toolforest` directory into your HA
    config directory's `custom_components/` directory. For a release archive,
    extract `toolforest.zip` into `custom_components/toolforest/` (the archive
    contains the integration's files directly). Restart Home Assistant.
