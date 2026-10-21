@@ -16,7 +16,7 @@ def build_package(output: Path, expected_version: str | None = None) -> Path:
     files = {
         path.relative_to(COMPONENT).as_posix(): path
         for path in COMPONENT.rglob("*")
-        if path.is_file() and path.suffix in {".py", ".json"}
+        if path.is_file() and path.suffix in {".py", ".json", ".png"}
     }
     files["LICENSE"] = ROOT / "LICENSE"
     output.parent.mkdir(parents=True, exist_ok=True)

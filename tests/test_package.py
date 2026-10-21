@@ -14,6 +14,7 @@ def test_release_contains_installable_integration_and_license(tmp_path):
         names = set(archive.namelist())
         assert {"__init__.py", "manifest.json", "config_flow.py", "LICENSE"} <= names
         assert "translations/en.json" in names
+        assert {"brand/icon.png", "brand/icon@2x.png"} <= names
         assert not any(
             name.startswith(("tests/", "custom_components/")) for name in names
         )
