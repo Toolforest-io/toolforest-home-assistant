@@ -20,19 +20,20 @@ remains in `Toolforest-io/curly-octo-computing-machine`. The integration is not 
 Home Assistant Supervisor add-on and does not run a separate service.
 
 The repository follows the [HACS integration layout](https://www.hacs.dev/docs/publish/integration/).
-It has not been submitted to the HACS default catalog, and no release has been
-published yet. For custom-repository installation, add
+The integration is released as
+[v0.1.0](https://github.com/Toolforest-io/toolforest-home-assistant/releases/tag/v0.1.0).
+[Default-catalog inclusion](https://github.com/hacs/default/pull/12416) is awaiting
+HACS maintainers. For custom-repository installation, add
 `https://github.com/Toolforest-io/toolforest-home-assistant` as a **custom
 repository** of type **Integration** in HACS, then download **Home Assistant
-toolkit** from `main` and restart Home Assistant. HACS downloads the integration
-directory from GitHub source; a published release asset is not required for this
-path. Published versions will appear in HACS once releases are available. The
-`toolforest.zip` archive remains available for manual installation.
+toolkit**, version **v0.1.0**, and restart Home Assistant. The release's
+`toolforest.zip` archive is also available for manual installation.
 
-The toolkit is currently enabled for **dev verification only**. HACS distribution
-does not enable the Toolforest toolkit in test or production. See
+Pair with the Toolforest environment matching your account: **Production**,
+**Test**, or **Development**. Accounts and device connections are separate in each
+environment. Installing through HACS does not pair the integration. See
 [HACS validation and release preparation](docs/HACS_RELEASE.md) for checks,
-installation evidence and the separate release/catalog approval steps.
+installation evidence and release/catalog history.
 
 ## Install and pair
 
@@ -44,8 +45,8 @@ installation evidence and the separate release/catalog approval steps.
 2. In **Settings → Devices & services → Add integration**, find
    **Home Assistant toolkit**.
 3. Enter an instance name and select the environment matching your Toolforest
-   account. The toolkit is enabled only for development verification, so use
-   `dev` there; its test and production catalog entries remain disabled.
+   account: **Production** for your production account, or **Test**/**Development**
+   for a matching test/dev account.
 4. Open the displayed Toolforest activation URL, sign in to the matching
    environment, and approve the displayed device code. Return to the HA setup
    dialog and submit. Codes expire after ten minutes; pending polls are throttled.
