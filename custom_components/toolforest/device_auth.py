@@ -12,9 +12,16 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_revoke_device(hass, environment, access_token):
     """Revoke one credential without logging it or an upstream response body."""
+    endpoint = ENVIRONMENTS.get(environment)
+    if endpoint is None:
+        _LOGGER.warning(
+            "Home Assistant toolkit cannot revoke an unsupported pairing; "
+            "remove the original device in its Toolforest account"
+        )
+        return
     try:
         async with async_get_clientsession(hass).post(
-            f"{ENVIRONMENTS[environment][0]}/device/revoke-self",
+            f"{endpoint[0]}/device/revoke-self",
             headers={"Authorization": f"Bearer {access_token}"},
             json={},
             timeout=aiohttp.ClientTimeout(total=10),

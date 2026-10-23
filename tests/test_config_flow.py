@@ -5,8 +5,9 @@ from unittest.mock import patch
 
 import aiohttp
 import pytest
+import voluptuous as vol
 from homeassistant.config_entries import SOURCE_REAUTH, SOURCE_USER
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import FlowResultType, InvalidData
 
 from custom_components.toolforest.const import DOMAIN
 
@@ -18,8 +19,11 @@ async def start_pairing(hass):
         DOMAIN, context={"source": SOURCE_USER}
     )
     assert result["step_id"] == "user"
+    assert {key.schema for key in result["data_schema"].schema} == {"name"}
+    with pytest.raises(vol.Invalid):
+        result["data_schema"]({"name": "My HA", "environment": "test"})
     return await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"name": "My HA", "environment": "dev"}
+        result["flow_id"], {"name": "My HA"}
     )
 
 
@@ -38,18 +42,18 @@ async def test_pairing_exposure_creates_entry(hass, device_api, mock_setup_entry
     await hass.async_block_till_done()
     assert result["type"] is FlowResultType.CREATE_ENTRY
     entry = result["result"]
-    assert entry.unique_id == "dev:new-instance"
-    assert entry.data == {"name": "My HA", "environment": "dev", **device_api.token}
+    assert entry.unique_id == "prod:new-instance"
+    assert entry.data == {"name": "My HA", "environment": "prod", **device_api.token}
     assert entry.options["read_entities"] == ["light.allowed"]
     assert [call[0] for call in device_api.calls] == [
-        "/dev/device/code",
-        "/dev/device/token",
+        "/prod/device/code",
+        "/prod/device/token",
     ]
     mock_setup_entry.assert_awaited_once()
 
 
 async def test_pending_poll_is_throttled(hass, device_api, freezer):
-    device_api.responses["/dev/device/token"] = (
+    device_api.responses["/prod/device/token"] = (
         400,
         {"error": "authorization_pending"},
     )
@@ -59,7 +63,7 @@ async def test_pending_poll_is_throttled(hass, device_api, freezer):
         assert result["errors"] == {"base": "authorization_pending"}
     assert len(device_api.calls) == 2
     freezer.tick(6)
-    device_api.responses.pop("/dev/device/token")
+    device_api.responses.pop("/prod/device/token")
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["step_id"] == "exposure"
     hass.config_entries.flow.async_abort(result["flow_id"])
@@ -68,7 +72,7 @@ async def test_pending_poll_is_throttled(hass, device_api, freezer):
 
 @pytest.mark.parametrize("error", ["access_denied", "expired_token"])
 async def test_pairing_denied_or_expired(hass, device_api, error):
-    device_api.responses["/dev/device/token"] = (400, {"error": error})
+    device_api.responses["/prod/device/token"] = (400, {"error": error})
     result = await start_pairing(hass)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.ABORT
@@ -109,7 +113,7 @@ async def test_exposure_validation_and_abort_revocation(hass, device_api):
     assert not any("revoke-self" in call[0] for call in device_api.calls)
     hass.config_entries.flow.async_abort(result["flow_id"])
     await hass.async_block_till_done()
-    assert device_api.calls[-1] == ("/dev/device/revoke-self", {}, "Bearer new-token")
+    assert device_api.calls[-1] == ("/prod/device/revoke-self", {}, "Bearer new-token")
     assert not hass.config_entries.async_entries(DOMAIN)
 
 
@@ -143,23 +147,23 @@ async def test_abort_while_token_request_is_in_flight_revokes_returned_token(
         finish.set()
         result = await task
         assert result["type"] is FlowResultType.ABORT
-    assert device_api.calls[-1] == ("/dev/device/revoke-self", {}, "Bearer new-token")
+    assert device_api.calls[-1] == ("/prod/device/revoke-self", {}, "Bearer new-token")
     assert not hass.config_entries.async_entries(DOMAIN)
 
 
 async def test_initial_connection_error_keeps_entered_settings(hass, device_api):
-    device_api.responses["/dev/device/code"] = (503, {})
+    device_api.responses["/prod/device/code"] = (503, {})
     result = await start_pairing(hass)
     assert result["step_id"] == "user"
     assert result["errors"] == {"base": "cannot_connect"}
     defaults = {key.schema: key.default() for key in result["data_schema"].schema}
-    assert defaults == {"name": "My HA", "environment": "dev"}
+    assert defaults == {"name": "My HA"}
 
 
 async def test_abandoned_pairing_failed_revoke_warns_without_secret(
     hass, device_api, caplog
 ):
-    device_api.responses["/dev/device/revoke-self"] = (503, {})
+    device_api.responses["/prod/device/revoke-self"] = (503, {})
     result = await start_pairing(hass)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     hass.config_entries.flow.async_abort(result["flow_id"])
@@ -171,13 +175,13 @@ async def test_abandoned_pairing_failed_revoke_warns_without_secret(
 async def test_duplicate_entry_abort_revokes_unused_token(
     hass, device_api, config_entry
 ):
-    hass.config_entries.async_update_entry(config_entry, unique_id="dev:new-instance")
+    hass.config_entries.async_update_entry(config_entry, unique_id="prod:new-instance")
     result = await start_pairing(hass)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     await hass.async_block_till_done()
     assert result["reason"] == "already_configured"
-    assert device_api.calls[-1] == ("/dev/device/revoke-self", {}, "Bearer new-token")
+    assert device_api.calls[-1] == ("/prod/device/revoke-self", {}, "Bearer new-token")
     assert config_entry.data["access_token"] == "old-token"
 
 
@@ -187,7 +191,7 @@ async def test_reauth_error_preserves_environment_name_and_updates_identity(
     config_entry,
     mock_setup_entry,
 ):
-    device_api.responses["/dev/device/code"] = [(503, {}), (200, device_api.code)]
+    device_api.responses["/prod/device/code"] = [(503, {}), (200, device_api.code)]
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": SOURCE_REAUTH, "entry_id": config_entry.entry_id},
@@ -202,13 +206,45 @@ async def test_reauth_error_preserves_environment_name_and_updates_identity(
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     await hass.async_block_till_done()
     assert result["reason"] == "reauth_successful"
-    assert config_entry.unique_id == "dev:new-instance"
+    assert config_entry.unique_id == "prod:new-instance"
     assert config_entry.data == {
         "name": "My HA",
-        "environment": "dev",
+        "environment": "prod",
         **device_api.token,
     }
     assert config_entry.title == "My HA"
     assert config_entry.options["read_entities"] == ["light.allowed"]
-    assert all(call[0].startswith("/dev/") for call in device_api.calls)
+    assert all(call[0].startswith("/prod/") for call in device_api.calls)
     assert not any("revoke-self" in call[0] for call in device_api.calls)
+
+
+@pytest.mark.parametrize("environment", ["dev", "test", "unknown", None, "missing"])
+async def test_unsupported_pairing_reauth_never_contacts_service(
+    hass, config_entry, device_api, environment
+):
+    data = {**config_entry.data, "environment": environment}
+    if environment == "missing":
+        del data["environment"]
+    hass.config_entries.async_update_entry(config_entry, data=data)
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": SOURCE_REAUTH, "entry_id": config_entry.entry_id},
+        data=config_entry.data,
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "unsupported_pairing"
+    assert not device_api.calls and not device_api.sockets
+    assert config_entry.data["access_token"] == "old-token"
+
+
+async def test_unexpected_environment_input_cannot_redirect_pairing(hass, device_api):
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    with pytest.raises(InvalidData, match="environment"):
+        await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"name": "My HA", "environment": "dev"}
+        )
+    assert not device_api.calls and not device_api.sockets
+    hass.config_entries.flow.async_abort(result["flow_id"])
+    await hass.async_block_till_done()

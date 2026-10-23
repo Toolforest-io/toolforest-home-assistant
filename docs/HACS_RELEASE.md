@@ -1,9 +1,9 @@
 # Home Assistant toolkit: HACS validation and release preparation
 
-The Home Assistant toolkit is currently enabled for dev verification only.
-Publishing this integration does not deploy or enable the Toolforest gateway,
-toolkit Lambda or portal catalog in another environment. It does not
-automatically expose an existing Apple Home configuration.
+The released Home Assistant toolkit connects only to Toolforest Production.
+The gateway, toolkit Lambda, portal and public setup guide are live. Publishing
+this integration is a separate release step. It does not automatically expose
+an existing Apple Home configuration.
 
 ## Distribution
 
@@ -35,7 +35,7 @@ Local checks from this repository:
 python -m pip install -r requirements-test.txt
 ruff check custom_components tests scripts
 python -m pytest -q
-python scripts/package.py --version 0.1.0
+python scripts/package.py --version 0.1.1
 git diff --check
 ```
 
@@ -44,13 +44,9 @@ Python 3.12, the release job's existing runtime.
 
 ## Isolated HACS installation verification
 
-Use a disposable HA instance with writable `custom_components`, not the paired
-dev instance whose integration mount is read-only. On the Mac mini the prepared
-instance is `http://127.0.0.1:8124`, container `toolforest-hacs-readiness`, with
-configuration at
-`/Volumes/Postgresql/toolforest-ha/ha-data/hacs-readiness`. It uses the same pinned
-HA 2026.10.1 image as the existing dev instance. No paired credentials or config
-entries are copied into it.
+Use a disposable HA instance with writable `custom_components`, separate from
+any existing paired instance. Use the pinned HA 2026.10.1 image documented in
+the README. Do not copy paired credentials or config entries into it.
 
 1. Install the official HACS release and complete native HA onboarding.
 2. Add HACS through **Settings → Devices & services → Add integration** and
@@ -67,9 +63,8 @@ entries are copied into it.
    Compare the installed files again. Do not claim published-release update
    coverage from a source-branch download.
 
-Resume the prepared instance with `docker start toolforest-hacs-readiness`.
-Stop only this test instance with `docker stop toolforest-hacs-readiness`.
-Do not change or restart `toolforest-home-assistant-dev` on port 8123.
+Resume or stop only the disposable container used for these checks. Preserve
+existing paired instances and their configuration.
 
 Installation/update results and exact revisions must be recorded after the live
 checks; this preparation document alone is not evidence that they passed.
