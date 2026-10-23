@@ -1,5 +1,10 @@
 # Home Assistant toolkit verification
 
+The results below are historical records for earlier revisions. The v0.1.1
+release candidate connects only to Toolforest Production; earlier environment
+references do not describe its setup options. Its new verification results are
+recorded separately in `docs/PRODUCTION_ONLY_RELEASE.md`.
+
 Verification records for the corrected Home Assistant scope of
 [toolforest_tools#2197](https://github.com/Toolforest-io/toolforest_tools/issues/2197#issuecomment-6163254252).
 The Home Assistant toolkit does not automatically expose an existing Apple Home configuration.

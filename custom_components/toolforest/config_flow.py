@@ -87,7 +87,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         errors = {}
         if user_input is not None:
-            self.settings = user_input
+            self.settings = {"name": user_input["name"], "environment": "prod"}
             try:
                 await self._start_pairing()
                 return await self.async_step_pairing()
@@ -101,11 +101,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(
                         "name", default=self.settings.get("name", "Home Assistant")
                     ): vol.All(str, vol.Length(min=1, max=64)),
-                    vol.Required(
-                        "environment", default=self.settings.get("environment", "prod")
-                    ): vol.In(
-                        {"dev": "Development", "test": "Test", "prod": "Production"}
-                    ),
                 }
             ),
         )
@@ -193,6 +188,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_reauth(self, entry_data):
+        if entry_data.get("environment") not in ENVIRONMENTS:
+            return self.async_abort(reason="unsupported_pairing")
         self.reauth_entry = self._get_reauth_entry()
         self.settings = {k: entry_data[k] for k in ("environment", "name")}
         return await self.async_step_reauth_confirm()

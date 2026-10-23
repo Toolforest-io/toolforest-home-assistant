@@ -43,7 +43,7 @@ async def test_setup_sensor_options_reload_and_unload(hass, config_entry, device
     assert config_entry.state is ConfigEntryState.LOADED
     assert runtime["executor"].active
     assert sensor(hass).state == "connected"
-    assert sensor(hass).attributes["environment"] == "dev"
+    assert sensor(hass).attributes["environment"] == "prod"
     assert "old-token" not in str(sensor(hass))
     runtime["transport"].status("reconnecting")
     await hass.async_block_till_done()
@@ -190,8 +190,8 @@ async def test_loaded_entry_reauth_reloads_once_with_new_identity(
     await asyncio.wait_for(device_api.connected.wait(), 2)
     await hass.async_block_till_done()
     assert result["reason"] == "reauth_successful"
-    assert config_entry.unique_id == "dev:new-instance"
-    assert config_entry.data["environment"] == "dev"
+    assert config_entry.unique_id == "prod:new-instance"
+    assert config_entry.data["environment"] == "prod"
     await connected(hass.data[DOMAIN][config_entry.entry_id])
     assert len(device_api.sockets) == 2
     assert hass.data[DOMAIN][config_entry.entry_id]["executor"].active
@@ -202,9 +202,9 @@ async def test_loaded_entry_reauth_reloads_once_with_new_identity(
 async def test_entry_removal_attempts_revocation(
     hass, config_entry, device_api, caplog, status
 ):
-    device_api.responses["/dev/device/revoke-self"] = (status, {})
+    device_api.responses["/prod/device/revoke-self"] = (status, {})
     await hass.config_entries.async_remove(config_entry.entry_id)
-    assert device_api.calls[-1] == ("/dev/device/revoke-self", {}, "Bearer old-token")
+    assert device_api.calls[-1] == ("/prod/device/revoke-self", {}, "Bearer old-token")
     assert not hass.config_entries.async_entries(DOMAIN)
     assert ("could not confirm device revocation" in caplog.text) == (status == 500)
     assert "old-token" not in caplog.text
@@ -219,4 +219,25 @@ async def test_entry_removal_network_failure_is_safe(hass, config_entry, caplog,
         await hass.config_entries.async_remove(config_entry.entry_id)
     assert not hass.config_entries.async_entries(DOMAIN)
     assert "could not confirm device revocation" in caplog.text
+    assert "old-token" not in caplog.text
+
+
+@pytest.mark.parametrize("environment", ["dev", "test", "unknown", None, "missing"])
+async def test_unsupported_pairing_never_connects_or_revokes_in_production(
+    hass, config_entry, device_api, environment, caplog
+):
+    data = {**config_entry.data, "environment": environment}
+    if environment == "missing":
+        del data["environment"]
+    hass.config_entries.async_update_entry(config_entry, data=data)
+    assert not await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert config_entry.state is ConfigEntryState.SETUP_ERROR
+    assert DOMAIN not in hass.data
+    assert not device_api.calls and not device_api.sockets
+    assert config_entry.data["access_token"] == "old-token"
+    assert await hass.config_entries.async_remove(config_entry.entry_id)
+    assert not hass.config_entries.async_entries(DOMAIN)
+    assert not device_api.calls and not device_api.sockets
+    assert "cannot revoke an unsupported pairing" in caplog.text
     assert "old-token" not in caplog.text

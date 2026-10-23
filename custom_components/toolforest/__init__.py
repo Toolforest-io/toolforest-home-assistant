@@ -6,16 +6,23 @@ import asyncio
 import contextlib
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import DOMAIN, STATUS_SIGNAL
+from .const import DOMAIN, ENVIRONMENTS, STATUS_SIGNAL
 from .device_auth import async_revoke_device
 from .executor import Executor, validate_exposure
 from .transport import BridgeTransport
 
 
 async def async_setup_entry(hass, entry):
+    if entry.data.get("environment") not in ENVIRONMENTS:
+        raise ConfigEntryError(
+            "This pairing is not supported by this release. "
+            "Remove the integration and pair again with your Toolforest account. "
+            "Also revoke the original device in its Toolforest account."
+        )
     validate_exposure(entry.options)
     executor = Executor(hass, entry)
     runtime = {"status": "connecting", "executor": executor}
@@ -75,5 +82,5 @@ async def async_unload_entry(hass, entry):
 async def async_remove_entry(hass, entry):
     # Removal revokes the remote device; unload/reload preserves pairing.
     await async_revoke_device(
-        hass, entry.data["environment"], entry.data["access_token"]
+        hass, entry.data.get("environment"), entry.data["access_token"]
     )

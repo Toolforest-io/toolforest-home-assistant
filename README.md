@@ -20,18 +20,19 @@ remains in `Toolforest-io/curly-octo-computing-machine`. The integration is not 
 Home Assistant Supervisor add-on and does not run a separate service.
 
 The repository follows the [HACS integration layout](https://www.hacs.dev/docs/publish/integration/).
-The integration is released as
-[v0.1.0](https://github.com/Toolforest-io/toolforest-home-assistant/releases/tag/v0.1.0).
+This checkout prepares the production-only v0.1.1 release.
+The current published release is
+[v0.1.0](https://github.com/Toolforest-io/toolforest-home-assistant/releases/tag/v0.1.0);
+until v0.1.1 is published, select Production in its setup form.
 [Default-catalog inclusion](https://github.com/hacs/default/pull/12416) is awaiting
 HACS maintainers. For custom-repository installation, add
 `https://github.com/Toolforest-io/toolforest-home-assistant` as a **custom
-repository** of type **Integration** in HACS, then download **Home Assistant
-toolkit**, version **v0.1.0**, and restart Home Assistant. The release's
+repository** of type **Integration** in HACS, then download the latest published
+**Home Assistant toolkit** release and restart Home Assistant. The release's
 `toolforest.zip` archive is also available for manual installation.
 
-Pair with the Toolforest environment matching your account: **Production**,
-**Test**, or **Development**. Accounts and device connections are separate in each
-environment. Installing through HACS does not pair the integration. See
+The production-only integration in this checkout connects to Toolforest automatically.
+Installing through HACS does not pair the integration. See
 [HACS validation and release preparation](docs/HACS_RELEASE.md) for checks,
 installation evidence and release/catalog history.
 
@@ -44,11 +45,10 @@ installation evidence and release/catalog history.
    contains the integration's files directly). Restart Home Assistant.
 2. In **Settings → Devices & services → Add integration**, find
    **Home Assistant toolkit**.
-3. Enter an instance name and select the environment matching your Toolforest
-   account: **Production** for your production account, or **Test**/**Development**
-   for a matching test/dev account.
-4. Open the displayed Toolforest activation URL, sign in to the matching
-   environment, and approve the displayed device code. Return to the HA setup
+3. Enter an instance name. The integration connects to Toolforest automatically;
+   there is no environment selector.
+4. Open the displayed Toolforest activation URL, sign in to your Toolforest
+   account, and approve the displayed device code. Return to the HA setup
    dialog and submit. Codes expire after ten minutes; pending polls are throttled.
 5. Select individual light/switch entities for reads. Nothing is selected by
    default. Separately select entities allowed to **turn on**, **turn off**, and
@@ -63,8 +63,14 @@ start a reauthentication flow. Removing the integration attempts remote device
 revocation; if the network is unavailable, revoke the device in Toolforest too.
 Abandoning setup after pairing also attempts to revoke the unused credential.
 If that cleanup cannot reach Toolforest, remove the offline device in the portal.
-Reauthentication retains the existing environment, name and exposure selections,
+Reauthentication retains the existing name and exposure selections,
 including after a connection error, and updates the entry's device identity.
+
+Existing Production pairings continue to work after upgrading. Pairings created
+against other services cannot be reused: this release leaves their credentials
+unchanged and stops before making any connection. Remove the integration entry,
+revoke its original device in the account where it was paired, and add the
+integration again to pair with Toolforest.
 
 The portal update accompanying the connection guide keeps the toolkit row compact:
 **Show me how to connect** opens the guide, and **⋮ → Manage connections** lists
@@ -125,8 +131,8 @@ control multiple devices; select individual entities when that is undesirable.
 - Revocation is rechecked against the authoritative device record before cloud
   dispatch. HA sessions expire after missed application heartbeats (120 seconds);
   the normal disconnect handler removes them sooner.
-- Only fixed Toolforest environment endpoints are configurable. No arbitrary
-  network proxy, lock/alarm/garage/camera domain, or unrestricted HA service
+- The integration connects only to fixed Toolforest Production endpoints.
+  No arbitrary network proxy, lock/alarm/garage/camera domain, or unrestricted HA service
   dispatcher is exposed. Authorized actions are logged by entity ID/action;
   credentials and raw state payloads are not logged.
 
@@ -143,7 +149,7 @@ instance, use the resume instructions below rather than recreating its config:
 colima start --cpu 4 --memory 6 --disk 30
 mkdir -p .task-state/home-assistant-config
 printf 'default_config:\ndemo:\n' > .task-state/home-assistant-config/configuration.yaml
-docker --context colima run -d --name toolforest-home-assistant-dev \
+docker --context colima run -d --name toolforest-home-assistant-demo \
   --restart unless-stopped -p 127.0.0.1:8123:8123 \
   -e TZ=America/Los_Angeles \
   -v "$PWD/.task-state/home-assistant-config:/config" \
@@ -158,20 +164,11 @@ Expose only a virtual light and switch and allow their on/off actions. Do not
 enable physical integrations for this test.
 
 For an existing container, resume with `docker --context colima start
-toolforest-home-assistant-dev`; after source changes restart that container.
+toolforest-home-assistant-demo`; after source changes restart that container.
 Inspect logs with `docker --context colima logs --tail 100
-toolforest-home-assistant-dev`. Configuration persists in `.task-state`, outside
+toolforest-home-assistant-demo`. Configuration persists in `.task-state`, outside
 the repository. Keep its credentials private. Stop this container with `docker
---context colima stop toolforest-home-assistant-dev`; avoid stopping other services.
-
-### Dev compatibility
-
-For a coordinated dev test, the integration, portal account and toolkit must all
-use the dev environment. Dev endpoints are `wss://bridge-dev.toolforest.io`,
-`https://bridge-api-dev.toolforest.io`, and `https://mcp.dev.toolforest.io/mcp`.
-Toolkit, gateway and portal deployments are managed separately; installing this
-integration does not deploy those services. Maintainers should follow the backend
-and portal repositories' deployment instructions.
+--context colima stop toolforest-home-assistant-demo`; avoid stopping other services.
 
 ## Verification
 
@@ -195,7 +192,7 @@ Tests use `pytest-homeassistant-custom-component==0.13.372`, which pins Home
 Assistant **2026.10.1** and its compatible pytest dependencies. Python **3.14.2+**
 is required. Configuration, options, reauth, sensors and entry lifecycle run
 through native Home Assistant; HTTP/WSS contract tests use ephemeral loopback
-servers with synthetic credentials, never a paired development instance.
+servers with synthetic credentials, never a paired live instance.
 
 Run the separate backend checks from `toolforest_tools`:
 
@@ -208,7 +205,7 @@ PYTHONPATH=.:packages/bridge-client/src:packages/mcp-lambda-runtime/src \
 
 The async transport contract tests open an ephemeral localhost WebSocket server.
 They need local socket permission. They supplement real tests; they do not
-substitute for pairing, real dev gateway/MCP calls, HA state confirmation,
+substitute for pairing, real gateway/MCP calls, HA state confirmation,
 portal status/selection/errors, revocation and unload/reload in a browser.
 
 See `VERIFICATION.md` for the recorded execution results and remaining gates.

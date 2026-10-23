@@ -48,12 +48,12 @@ async def server(unused_tcp_port, socket_enabled):
 @pytest.mark.asyncio
 async def test_protocol_headers_response_and_clean_stop(server, monkeypatch):
     endpoint, sockets, headers, ready, responses = server
-    monkeypatch.setitem(transport.ENVIRONMENTS, "dev", ("unused", endpoint))
+    monkeypatch.setitem(transport.ENVIRONMENTS, "prod", ("unused", endpoint))
     status = Mock()
     execute = AsyncMock(return_value={"state": "on"})
     async with aiohttp.ClientSession() as session:
         bridge = transport.BridgeTransport(
-            session, "secret", "dev", execute, status, Mock()
+            session, "secret", "prod", execute, status, Mock()
         )
         task = asyncio.create_task(bridge.run())
         await asyncio.wait_for(ready.wait(), 2)
@@ -77,7 +77,7 @@ async def test_protocol_headers_response_and_clean_stop(server, monkeypatch):
 @pytest.mark.asyncio
 async def test_revocation_cancels_inflight_and_never_reconnects(server, monkeypatch):
     endpoint, sockets, headers, ready, responses = server
-    monkeypatch.setitem(transport.ENVIRONMENTS, "dev", ("unused", endpoint))
+    monkeypatch.setitem(transport.ENVIRONMENTS, "prod", ("unused", endpoint))
     running = asyncio.Event()
     cancelled = asyncio.Event()
 
@@ -92,7 +92,7 @@ async def test_revocation_cancels_inflight_and_never_reconnects(server, monkeypa
     status = Mock()
     async with aiohttp.ClientSession() as session:
         bridge = transport.BridgeTransport(
-            session, "secret", "dev", execute, status, reauth
+            session, "secret", "prod", execute, status, reauth
         )
         task = asyncio.create_task(bridge.run())
         await asyncio.wait_for(ready.wait(), 2)
@@ -112,7 +112,7 @@ async def test_revocation_cancels_inflight_and_never_reconnects(server, monkeypa
 @pytest.mark.asyncio
 async def test_busy_rejects_concurrent_requests(server, monkeypatch):
     endpoint, sockets, _headers, ready, responses = server
-    monkeypatch.setitem(transport.ENVIRONMENTS, "dev", ("unused", endpoint))
+    monkeypatch.setitem(transport.ENVIRONMENTS, "prod", ("unused", endpoint))
     running = asyncio.Event()
 
     async def execute(message):
@@ -121,7 +121,7 @@ async def test_busy_rejects_concurrent_requests(server, monkeypatch):
 
     async with aiohttp.ClientSession() as session:
         bridge = transport.BridgeTransport(
-            session, "secret", "dev", execute, Mock(), Mock()
+            session, "secret", "prod", execute, Mock(), Mock()
         )
         task = asyncio.create_task(bridge.run())
         await asyncio.wait_for(ready.wait(), 2)
@@ -144,11 +144,11 @@ async def test_busy_rejects_concurrent_requests(server, monkeypatch):
 
 async def test_application_heartbeat_is_sent_and_cleanly_cancelled(server, monkeypatch):
     endpoint, _sockets, _headers, ready, responses = server
-    monkeypatch.setitem(transport.ENVIRONMENTS, "dev", ("unused", endpoint))
+    monkeypatch.setitem(transport.ENVIRONMENTS, "prod", ("unused", endpoint))
     monkeypatch.setattr(transport, "HEARTBEAT_SECONDS", 0.02)
     async with aiohttp.ClientSession() as session:
         bridge = transport.BridgeTransport(
-            session, "secret", "dev", AsyncMock(), Mock(), Mock()
+            session, "secret", "prod", AsyncMock(), Mock(), Mock()
         )
         task = asyncio.create_task(bridge.run())
         await asyncio.wait_for(ready.wait(), 2)
@@ -164,14 +164,14 @@ async def test_application_heartbeat_is_sent_and_cleanly_cancelled(server, monke
 async def test_idle_connection_survives_receive_timeout(server, monkeypatch):
     # Like the gateway: answers WS pings, never replies to application pings.
     endpoint, _sockets, headers, ready, _responses = server
-    monkeypatch.setitem(transport.ENVIRONMENTS, "dev", ("unused", endpoint))
+    monkeypatch.setitem(transport.ENVIRONMENTS, "prod", ("unused", endpoint))
     monkeypatch.setattr(transport, "HEARTBEAT_SECONDS", 0.2)
     monkeypatch.setattr(transport, "WS_PING_SECONDS", 0.1)
     monkeypatch.setattr(transport, "RECEIVE_TIMEOUT_SECONDS", 0.3)
     status = Mock()
     async with aiohttp.ClientSession() as session:
         bridge = transport.BridgeTransport(
-            session, "secret", "dev", AsyncMock(), status, Mock()
+            session, "secret", "prod", AsyncMock(), status, Mock()
         )
         task = asyncio.create_task(bridge.run())
         await asyncio.wait_for(ready.wait(), 2)

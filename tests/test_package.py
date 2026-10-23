@@ -1,5 +1,6 @@
 """Check that the release can be installed without the development checkout."""
 
+import ast
 import json
 from zipfile import ZipFile
 
@@ -32,3 +33,27 @@ def test_release_version_mismatch_cannot_create_archive(tmp_path):
     with pytest.raises(ValueError, match="manifest version"):
         build_package(output, expected_version="999.0.0")
     assert not output.exists()
+
+
+def test_release_contains_only_production_endpoints(tmp_path):
+    output = build_package(tmp_path / "toolforest.zip")
+    with ZipFile(output) as archive:
+        constants = {
+            assignment.targets[0].id: ast.literal_eval(assignment.value)
+            for assignment in ast.parse(archive.read("const.py")).body
+            if isinstance(assignment, ast.Assign)
+        }
+        assert constants["ENVIRONMENTS"] == {
+            "prod": ("https://bridge-api.toolforest.io", "wss://bridge.toolforest.io")
+        }
+        assert constants["VERSION"] == json.loads(archive.read("manifest.json"))["version"]
+        for name in archive.namelist():
+            if name.endswith((".py", ".json")):
+                content = archive.read(name)
+                assert b"bridge-api-dev.toolforest.io" not in content
+                assert b"bridge-api-test.toolforest.io" not in content
+                assert b"bridge-dev.toolforest.io" not in content
+                assert b"bridge-test.toolforest.io" not in content
+        for name in ("strings.json", "translations/en.json"):
+            data = json.loads(archive.read(name))
+            assert set(data["config"]["step"]["user"]["data"]) == {"name"}

@@ -6,8 +6,7 @@
         "title": "Home Assistant toolkit",
         "description": "Connect devices managed by Home Assistant. This does not automatically expose an existing Apple Home configuration.",
         "data": {
-          "name": "Instance name",
-          "environment": "Toolforest environment"
+          "name": "Instance name"
         }
       },
       "pairing": {
@@ -37,7 +36,8 @@
     "abort": {
       "pairing_expired": "The pairing code expired or was already used. Start setup again.",
       "reauth_successful": "Pairing updated.",
-      "already_configured": "This device is already configured."
+      "already_configured": "This device is already configured.",
+      "unsupported_pairing": "This pairing is not supported by this release. Remove the integration and pair again with your Toolforest account. Also revoke the original device in its Toolforest account."
     }
   },
   "options": {

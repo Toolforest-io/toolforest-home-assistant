@@ -16,10 +16,10 @@ def config_entry(hass):
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="My HA",
-        unique_id="dev:old-instance",
+        unique_id="prod:old-instance",
         data={
             "name": "My HA",
-            "environment": "dev",
+            "environment": "prod",
             "device_id": "old-instance",
             "access_token": "old-token",
         },
